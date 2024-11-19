@@ -10,40 +10,41 @@ import CustomInput from './components/CustomInput';
 import './App.css';
 
 const App = () => {
-  const [code, setCode] = useState('// Write your code here');
+  const [code, setCode] = useState('Write your code here');
   const [output, setOutput] = useState('');
   const [language, setLanguage] = useState('javascript');
   const [theme, setTheme] = useState('vs-dark');
   const [customInput, setCustomInput] = useState('');
 
-  /**
-   * Function to execute code using the backend API
-   */
   const executeCode = async () => {
     try {
-      const response = await axios.post('http://172.105.52.188:3000/execute', {
+      const response = await axios.post('http://194.195.117.239:3000/execute', {
         language,
         code,
         input: customInput,
       });
 
-      // Handle API response
+      // Handle successful API response
       setOutput(response.data.stdout || response.data.stderr || 'No output');
     } catch (error) {
       console.error('Error executing code:', error);
-      setOutput('Error: Unable to connect to server.');
+
+      // Handle specific error responses from backend (e.g., invalid language, execution errors)
+      if (error.response && error.response.data) {
+        setOutput(error.response.data.error || 'Error during execution');
+      } else {
+        setOutput('Error: Unable to connect to server.');
+      }
     }
   };
 
-  /**
-   * Handles the "Run" button click event
-   */
   const handleRun = () => {
     if (!language || !code) {
-      setOutput('Please select a language and provide code to run.');
+      setOutput('Please select a language and write your code');
       return;
     }
 
+    setOutput('Executing...'); // Show loading state before actual execution
     executeCode();
   };
 
@@ -56,13 +57,13 @@ const App = () => {
         <GitHubButton />
       </div>
 
-      {/* Editor and Output Section */}
+      {/* Editor and Output Section  */}
       <div className="editor-container">
         <Editor code={code} setCode={setCode} theme={theme} language={language} />
         <Output output={output} />
       </div>
 
-      {/* Footer Section */}
+      {/* Footer Section custom input */}
       <div className="footer">
         <CustomInput customInput={customInput} setCustomInput={setCustomInput} />
         <button onClick={handleRun}>Run</button>
