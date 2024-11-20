@@ -1,22 +1,28 @@
 import express from 'express';
 import axios from 'axios';
 import cors from 'cors';
-import helmet from 'helmet'; // Security headers
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import process from 'node:process';
+
+// Initialize dotenv before using env variables
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-// Configure CORS to allow requests only from your specific frontend URL
+// Get API key from environment variables
+const RAPID_API_KEY = process.env.RAPID_API_KEY;
+
+// Configure CORS
 app.use(cors({
-  origin: 'http://194.195.117.239:5173', // Replace with your frontend's URL
+  origin: 'http://localhost:5173',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
-// Security headers
 app.use(helmet());
-
 app.use(express.json());
 
 // Test endpoint
@@ -26,8 +32,6 @@ app.get('/test', (req, res) => {
 
 // Code execution endpoint
 app.post('/execute', async (req, res) => {
-  console.log('Received request:', req.body); // Debug log
-
   const { language, code, input } = req.body;
 
   if (!language || !code) {
@@ -53,23 +57,36 @@ app.post('/execute', async (req, res) => {
   }
 
   try {
-    console.log('Sending request to Judge0...'); // Debug log
-    const response = await axios.post('http://172.105.52.188:2358/submissions/?base64_encoded=false&wait=true', {
+    // Submit code
+    const submitResponse = await axios.post('https://judge0-ce.p.rapidapi.com/submissions', {
       source_code: code,
       language_id: languageId,
-      stdin: input || '',
+      stdin: input || ''
     }, {
       headers: {
-        'Content-Type': 'application/json'
+        'content-type': 'application/json',
+        'X-RapidAPI-Key': RAPID_API_KEY,
+        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
       }
     });
 
-    console.log('Received response from Judge0:', response.data); // Debug log
-    res.json(response.data);
+    const token = submitResponse.data.token;
+
+    // Wait for results
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Get submission results
+    const resultResponse = await axios.get(`https://judge0-ce.p.rapidapi.com/submissions/${token}`, {
+      headers: {
+        'X-RapidAPI-Key': RAPID_API_KEY,
+        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+      }
+    });
+
+    console.log('Execution results:', resultResponse.data);
+    res.json(resultResponse.data);
   } catch (error) {
     console.error('Error details:', error.response?.data || error.message);
-
-    // Return generic error message in production
     res.status(500).json({
       error: 'Execution failed',
       message: 'An error occurred during code execution.'
@@ -78,7 +95,7 @@ app.post('/execute', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   console.error('Server error:', err);
   res.status(500).json({
     error: 'Internal server error',
@@ -88,7 +105,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://194.195.117.239:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 }).on('error', (err) => {
   console.error('Failed to start server:', err);
 });
